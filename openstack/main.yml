@@ -1,0 +1,79 @@
+---
+- hosts: localhost
+  connection: local
+  vars:
+    servers:
+      app1:
+       name: app1
+       group: apps
+       deployment: QA
+       security_groups: apps
+      app2:
+       name: app2
+       group: apps
+       deployment: QA
+       security_groups: apps
+      db:
+       name: appdb
+       group: appdbs
+       deployment: QA
+       security_groups: apps
+      frontend:
+       name: frontend
+       group: frontends
+       deployment: QA
+       security_groups: frontend
+
+  tasks:
+  - name: Provision server
+    include_role:
+      name: create_server
+    vars:
+      server : "{{ item.value }}"
+    loop: "{{ lookup('dict', servers) }}"
+
+  - name: Fetch Instance Info
+    os_server_facts:
+      cloud: ospcloud
+      region_name: RegionOne
+    register: r_os_servers
+
+  - name: Add host
+    add_host:
+      name: "{{ item.public_v4 }}"
+      ansible_ssh_private_key_file: /root/.ssh/test_id_rsa
+      ansible_user: cloud-user
+      host_key_checking: false
+      group:
+        - "{{ item.metadata.group }}"
+        - "{{ item.metadata.deployment_name }}"
+    loop: "{{ r_os_servers.ansible_facts.openstack_servers }}"
+
+- hosts: all
+  become: yes
+  gather_facts: yes
+  tasks:
+  - import_role:
+      name: common
+
+- hosts: frontends
+  become: yes
+  gather_facts: no
+  tasks:
+  - import_role:
+      name: deploy_haproxy
+
+- hosts: apps
+  become: yes
+  gather_facts: no
+  tasks:
+  - import_role:
+      name: deploy_tomcat
+
+- hosts: appdbs
+  become: yes
+  vars_files:
+    - vars/main.yml
+  tasks:
+  - import_role:
+      name: geerlingguy.postgresql

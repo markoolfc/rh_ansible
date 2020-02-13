@@ -1,0 +1,4 @@
+---
+# vars file for deploy_haproxy
+frontend_port: 80
+tomcat_port: 8080
